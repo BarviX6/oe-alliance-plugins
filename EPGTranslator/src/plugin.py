@@ -6,8 +6,7 @@ from __future__ import print_function
 # for localized messages
 from . import _
 
-
-EPGTrans_vers = "2.02-rc2"
+EPGTrans_vers = "2.02-release"
 
 from Components.ActionMap import ActionMap
 from Components.config import (config, configfile, ConfigSubsection,
@@ -30,7 +29,7 @@ from Screens.Screen import Screen
 from Screens.VirtualKeyBoard import VirtualKeyBoard
 from Tools.Directories import fileExists
 
-import sys, re, time, os, traceback, inspect
+import sys, re, time, os, traceback
 
 from .AutoflushCache import AutoflushCache
 from .HTML5Entities import name2codepoint
@@ -248,6 +247,15 @@ for c in ([" ", "\n", "\t"]):   # Actually .<ws>
 def DO_translation(text, source, dest):     # source, dest are langs
     global enc_wspace, enc_space
 
+# It seems that this incoming text may contain some EIT CR/LF sequences
+# (see estring.cpp)
+# So convert these to newlines now - they can end up being translated
+# into other (displayed) characters
+# Add any others to this list as required...
+#
+    for rpl in ("\xc2\x8a", "\xee\x82\x8a"):
+        text = text.replace(rpl, "\n")
+
     enc_text = quote(text)
     enc_len = len(enc_text)
     max = 7000              # Less than the actual ~7656 to 7707
@@ -464,11 +472,10 @@ def make_uref(sv_id, sv_name):
 
 # ==================================================================
 # We need to know where we are to find the files relative to this
-# script. Can't do this until we've defined a piece of code/object.
+# script.
 #
-plugin_location = os.path.dirname(inspect.getsourcefile(applySkinVars))
+plugin_location = os.path.dirname(os.path.realpath(__file__))
 def lang_flag(lang):    # Where the language images are
-    global plugin_location
     return plugin_location + '/pic/flag/' + lang  + '.png'
 
 # -*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
@@ -478,8 +485,6 @@ class translatorConfig(ConfigListScreen, Screen):
 
 # ==================================================================
     def __init__(self, session):
-        global plugin_location
-
         self.dict = {'plug_loc': plugin_location}
         self.skin = applySkinVars(MySD.translatorConfig_skin, self.dict)
         Screen.__init__(self, session)
@@ -554,16 +559,18 @@ Red: Refresh EPG
 
 # ==================================================================
     def __init__(self, session, text):
-        global plugin_location
-
         self.showsource = CfgPlTr.showsource.getValue()
-        if self.showsource == 'yes':    size = MySD.tMyes
-        else:                           size = MySD.tMno
+        if self.showsource == "yes":
+            size = MySD.tMyes
+        else:
+            size = MySD.tMno
 
         self.dict = {'size': size, 'plug_loc': plugin_location}
         self.skin = applySkinVars(MySD.translatorMain_skin, self.dict)
         self.session = session
         Screen.__init__(self, session)
+        if self.showsource != "yes":
+            self.skinName = ["translatorMainSingle", "translatorMain" ]
 
         self.text = text
         self.hideflag = True
